@@ -1,0 +1,52 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orders-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: orders-backend
+    ports:
+      - "3001:3001"
+    environment:
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      PORT: 3001
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - orders-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3001
+    container_name: orders-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - orders-network
+
+networks:
+  orders-network:
+    driver: bridge
+
